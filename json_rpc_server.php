@@ -1,7 +1,7 @@
 <?php
 
 define('JSON_RPC_DEBUG_FILE', $_SERVER['JSON_RPC_DEBUG_FILE']
-    ?? getenv('JSON_RPC_DEBUG_FILE')  ?:  '/var/log/json_rpc/transactions.log');
+    ?? getenv('JSON_RPC_DEBUG_FILE')  ?: false);
 define('JSON_RPC_PHP_METHODS_FOLDER',  $_SERVER['JSON_RPC_PHP_METHODS_FOLDER']
     ?? getenv('JSON_RPC_PHP_METHODS_FOLDER')  ?:  __DIR__ . DIRECTORY_SEPARATOR . 'php_methods');
 define('JSON_RPC_EXEC_METHODS_FOLDER', $_SERVER['JSON_RPC_EXEC_METHODS_FOLDER']
