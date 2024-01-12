@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [[ -z $RPC_PARAM_TEXT ]] 
+then
+	printf "Missing \"text\" param" >&2
+	exit -1
+fi
+
+printf "{\"echo back\": \"${RPC_PARAM_TEXT}\", \"user\": \"${RPC_USER}\"}";
+exit 0;
+
