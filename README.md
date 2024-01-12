@@ -27,10 +27,12 @@ parameters. For example:
 ```
 will create environment variable RPC_PARAM_TEXT="test test test".
 
-Also, RPC_ID, RPC_METHOD, RPC_PARAMS will be exposed to the environment.
-If any of the plugins populate php $_ENV[], it will also be available to the
+Also, RPC_ID, RPC_METHOD, RPC_PARAMS will be exposed to the environment.  
+If any of the plugins populates php $_ENV[], it will also be available to the
 php/exec methods.
 
+
+Some test commands:
 ```
 time curl -s -H 'Authorization: Basic admin:123456' -H 'Host: jsonrpc' -H 'Content-Type: application/json' http://localhost:8080/jsonrpc -d '{"jsonrpc":"2.0", "method":"php-echo", "params": {"text": "test test test"}, "id":1}'
 
