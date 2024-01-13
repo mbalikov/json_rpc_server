@@ -1,29 +1,21 @@
 <?php
 
-define('JSON_RPC_DEBUG_FILE', $_SERVER['JSON_RPC_DEBUG_FILE']
-    ?? getenv('JSON_RPC_DEBUG_FILE')  ?: false);
-define('JSON_RPC_PHP_METHODS_FOLDER',  $_SERVER['JSON_RPC_PHP_METHODS_FOLDER']
-    ?? getenv('JSON_RPC_PHP_METHODS_FOLDER')  ?:  __DIR__ . DIRECTORY_SEPARATOR . 'php_methods');
-define('JSON_RPC_EXEC_METHODS_FOLDER', $_SERVER['JSON_RPC_EXEC_METHODS_FOLDER']
-    ?? getenv('JSON_RPC_EXEC_METHODS_FOLDER') ?:  __DIR__ . DIRECTORY_SEPARATOR . 'exec_methods');
-define('JSON_RPC_PLUGINGS_FOLDER', $_SERVER['JSON_RPC_PLUGINS_FOLDER']
-    ?? getenv('JSON_RPC_PLUGINS_FOLDER') ?:  __DIR__ . DIRECTORY_SEPARATOR . 'plugins');
-
 error_reporting(E_ALL);
 ini_set('display_errors', "off");
 ini_set('max_execution_time', 0);
 ini_set('implicit_flush', 1);
 @set_time_limit(0);
 
-header("Content-Type: application/json\r\n");
-
 $RPC_DEBUG_OUTPUT = '';
-
 register_shutdown_function('shutdown_function');
+
+initialize();
 
 // ========================================================
 // PROCESS THE REQUEST
 //
+
+header("Content-Type: application/json\r\n");
 
 // read request
 $JSON_RPC_REQUEST = receive_json_post();
@@ -269,7 +261,43 @@ function env_param_name(string $param_name)
 {
     return 'RPC_PARAM_' . strtoupper(str_replace(' ', '_', $param_name));
 }
+
 // ========================================================
+function initialize() 
+{
+    define('JSON_RPC_DEBUG_FILE', $_SERVER['JSON_RPC_DEBUG_FILE']
+        ?? getenv('JSON_RPC_DEBUG_FILE')  ?: false);
+    define('JSON_RPC_PHP_METHODS_FOLDER',  $_SERVER['JSON_RPC_PHP_METHODS_FOLDER']
+        ?? getenv('JSON_RPC_PHP_METHODS_FOLDER')  ?:  __DIR__ . DIRECTORY_SEPARATOR . 'php_methods');
+    define('JSON_RPC_EXEC_METHODS_FOLDER', $_SERVER['JSON_RPC_EXEC_METHODS_FOLDER']
+        ?? getenv('JSON_RPC_EXEC_METHODS_FOLDER') ?:  __DIR__ . DIRECTORY_SEPARATOR . 'exec_methods');
+    define('JSON_RPC_PLUGINGS_FOLDER', $_SERVER['JSON_RPC_PLUGINS_FOLDER']
+        ?? getenv('JSON_RPC_PLUGINS_FOLDER') ?:  __DIR__ . DIRECTORY_SEPARATOR . 'plugins');
+    define('JSON_RPC_ENVIRONMENT_FILE', $_SERVER['JSON_RPC_ENVIRONMENT_FILE']
+        ?? getenv('JSON_RPC_ENVIRONMENT_FILE') ?:  __DIR__ . DIRECTORY_SEPARATOR . '.env');
+
+    // populate $_ENV[] with environment parameters from config file
+    if (file_exists(JSON_RPC_ENVIRONMENT_FILE))
+    {
+        $lines = file(JSON_RPC_ENVIRONMENT_FILE, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            foreach($lines as $line) {
+                $line = trim($line);
+                if ($line[0] == '#')
+                    continue;
+
+                list($key, $value) = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value);
+
+                if (empty($key) || empty($value))
+                    continue;
+
+                $_ENV[strtoupper($key)] = $value;
+            }
+        }
+    }
+}
 
 function receive_json_post()
 {

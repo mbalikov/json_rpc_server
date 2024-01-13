@@ -16,6 +16,7 @@ Config parameters:
 * JSON_RPC_PHP_METHODS_FOLDER -> location to PHP handlers (default: ./php_methods)
 * JSON_RPC_EXEC_METHODS_FOLDER -> location to exec/shell handlers (default: ./exec_methods)
 * JSON_RPC_PLUGINGS_FOLDER -> location to php plugins (default: ./plugins)
+* JSON_RPC_ENVIRONMENT_FILE -> default environment variables (default: ./.env)
 
 These config parameters are set via fastcgi params or environment.
 Check nginx.conf for an example.

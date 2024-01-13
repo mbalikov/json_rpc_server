@@ -2,10 +2,18 @@
 
 if [[ -z $RPC_PARAM_TEXT ]] 
 then
-	printf "Missing \"text\" param" >&2
+	printf "Missing \"text\" param" > /dev/stderr
 	exit -1
 fi
 
-printf "{\"echo back\": \"${RPC_PARAM_TEXT}\", \"user\": \"${RPC_USER}\"}";
+read -r -d '' RCP_OUTPUT << EOT
+{ 
+   "echo back": "${RPC_PARAM_TEXT}",
+   "user": "${RPC_USER}",
+   "log_folder": "${LOG_FOLDER}"
+}
+EOT
+
+printf "${RCP_OUTPUT}"
 exit 0;
 
