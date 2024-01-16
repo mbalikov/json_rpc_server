@@ -30,24 +30,35 @@ ignore_user_abort(true);
 // Process JSON RPC request
 if (array_key_exists('method', $JSON_RPC_REQUEST)) {
     $output = json_rpc_call($JSON_RPC_REQUEST['id'] ?? null, $JSON_RPC_REQUEST['method'], $JSON_RPC_REQUEST['params'] ?? null);
+    if ($output === true)
+        exit;
     json_rpc_debug_output($output);
     echo $output;
     exit;
 }
 // try to process it as a batch
-$output = [];
+$batch_output = [];
 foreach($JSON_RPC_REQUEST as $idx => $json_rcp) {
     if (!is_numeric($idx) || !is_array($json_rpc) || !array_key_exists('method', $json_rpc)) {
-        $output[] = json_rpc_error($json_rpc['id'] ?? null, -32600, "Invalid Request");
+        $output = json_rpc_error($json_rpc['id'] ?? null, -32600, "Invalid Request");
+        if ($output === true)
+            continue;
+        $batch_output[] = $output;
     }
     else {
-        $output[] = json_rpc_call($json_rcp['id'] ?? null, $json_rpc['method'], $json_rpc['params'] ?? null);
+        $output = json_rpc_call($json_rcp['id'] ?? null, $json_rpc['method'], $json_rpc['params'] ?? null);
+        if ($output === true)
+            continue;
+        $batch_output[] = $output;
     }
 }
 
+if (empty($batch_output))
+    exit;
+
 // output JSON array of the responses
-$output = '[' . implode(", ", $output) . ']';
-json_rpc_debug_output($output);
+$output = '[' . implode(", ", $batch_output) . ']';
+json_rpc_debug_output($batch_output);
 echo $output;
 exit;
 
@@ -58,8 +69,15 @@ exit;
  */
 function json_rpc_call($rpc_id, string $rpc_method, $rpc_params)
 {
+    $rpc_method = trim($rpc_method);
     if (empty($rpc_method))
         return json_rpc_error($rpc_id, -32600, "Invalid Request");
+
+    if ($rpc_method[0] == '/')
+        return json_rpc_error($rpc_id, 403, "Access Deny: method must not contain \"../\"");
+
+    if (strstr($rpc_method, '../') !== false)
+        return json_rpc_error($rpc_id, 403, "Access Deny: method must not contain \"../\"");
 
     $output = json_rpc_plugins($rpc_id, $rpc_method, $rpc_params);
     if (!empty($output))
@@ -69,18 +87,19 @@ function json_rpc_call($rpc_id, string $rpc_method, $rpc_params)
     $_ENV['RPC_METHOD'] = $rpc_method;
     $_ENV['RPC_PARAMS'] = json_encode($rpc_params);
 
-    $output = do_php_method($rpc_id, $rpc_method, $rpc_params);
+    $output = do_php_handler($rpc_id, $rpc_method, $rpc_params);
     if (!empty($output))
         return $output;
 
-    $output = do_exec_method($rpc_id, $rpc_method, $rpc_params);
+    $output = do_exec_handler($rpc_id, $rpc_method, $rpc_params);
     if (!empty($output))
         return $output;
 
     return json_rpc_error($rpc_id, -32601, "Method not found");
 }
 
-function json_rpc_result($id, $result) {
+function json_rpc_result($id, $result)
+{
     if (empty($id))
         throw new Exception("id is empty");
 
@@ -150,23 +169,31 @@ function json_rpc_plugins($rpc_id, $rpc_method, $rpc_params)
  *      }
  *  }
  */
-function do_php_method(string $rpc_id, string $rpc_method, $rpc_params)
+function do_php_handler($rpc_id, string $rpc_method, $rpc_params)
 {
-    $php_function = get_php_method($rpc_method);
+    $php_function = get_php_handler($rpc_method);
     if (!$php_function)
         return null;
 
-    try {
+    try {    
         $result = $php_function($rpc_params);
+        if (empty($rpc_id)) // this is notification, no reply is expected
+            return true;
+
         return json_rpc_result($rpc_id, $result);
     }
     catch (Throwable $e) {
-        error_log("JSON_RPC: php method failed: id=\"{$rpc_id}\", method=\"{$rpc_method}\", params=". json_encode($rpc_params));
+        error_log("JSON_RPC: do_php_handler() failed:"
+            . " id=\"{$rpc_id}\","
+            . " method=\"{$rpc_method}\","
+            . " params=". json_encode($rpc_params)
+            . " ERROR({$e->getCode()}) : {$e->getMessage()}");
+
         return json_rpc_error($rpc_id, $e->getCode(), $e->getMessage());
     }
 }
 
-function get_php_method(string $rpc_method)
+function get_php_handler(string $rpc_method)
 {
     static $PHP_FUNCTIONS = [];
     if (array_key_exists($rpc_method, $PHP_FUNCTIONS))
@@ -176,7 +203,7 @@ function get_php_method(string $rpc_method)
         $php_file = JSON_RPC_PHP_METHODS_FOLDER . DIRECTORY_SEPARATOR . $rpc_method . '.php';
         if (!file_exists($php_file))
             return null;
-
+    
         $method_function = require_once($php_file);
     }
     catch(Throwable $e) {
@@ -194,7 +221,7 @@ function get_php_method(string $rpc_method)
  * rpc_params will be passed as environment parameters
  * PARAM_key = value
  */
-function do_exec_method(string $rpc_id, string $rpc_method, $rpc_params)
+function do_exec_handler($rpc_id, string $rpc_method, $rpc_params)
 {
     $exec_file = JSON_RPC_EXEC_METHODS_FOLDER . DIRECTORY_SEPARATOR . $rpc_method;
     if (!file_exists($exec_file) || !is_executable($exec_file))
@@ -209,15 +236,15 @@ function do_exec_method(string $rpc_id, string $rpc_method, $rpc_params)
     }
     elseif (is_array($rpc_params)) {
         foreach ($rpc_params as $k => $v) {
-            $environment[env_param_name($k)] = $v;
+            if (!may_environment_key($k))
+                continue;
+            if (is_array($v))
+                continue;
+            $environment[env_param_name($k)] = empty($v) ? true : $v;
         };
     }
-    elseif (is_string($rcp_params)) {
+    elseif (may_environment_key($rcp_params)) {
         $environment[env_param_name($rpc_params)] = true;
-    }
-    else {
-        error_log("JSON_RPC: exec method : invalid params : id=\"{$rpc_id}\", method=\"{$rpc_method}\", params=". json_encode($rpc_params));
-        return json_rpc_error($rpc_id, -32602, "Invalid params");
     }
 
     // Options for proc_open
@@ -229,7 +256,11 @@ function do_exec_method(string $rpc_id, string $rpc_method, $rpc_params)
 
     $process = proc_open($exec_file, $descriptors, $pipes, '/tmp/', $environment);
     if (!is_resource($process)) {
-        error_log("JSON_RPC: exec method : failed to execute {$exec_file} : id=\"{$rpc_id}\", method=\"{$rpc_method}\", params=". json_encode($rpc_params));
+        error_log("JSON_RPC: do_exec_handler({$exec_file}) proc_open failed :"
+            . " id=\"{$rpc_id}\","
+            . " method=\"{$rpc_method}\","
+            . " params=". json_encode($rpc_params));
+
         return json_rpc_error($rpc_id, -32603, "Internal error");
     }
 
@@ -249,11 +280,13 @@ function do_exec_method(string $rpc_id, string $rpc_method, $rpc_params)
         return json_rpc_error($rpc_id, $exit_code, $error);
     }
 
-    $json_data = @json_decode($output);
-    if (!empty($json_data)) {
+    if (empty($rpc_id)) // this is notification, no reply is expected
+        return true;
+
+    $json_data = @json_decode($output, true);
+    if (is_array($json_data)) {
         $output = $json_data;
     }
-
     return json_rpc_result($rpc_id, $output);
 }
 
@@ -283,7 +316,7 @@ function initialize()
         if (is_array($lines)) {
             foreach($lines as $line) {
                 $line = trim($line);
-                if ($line[0] == '#')
+                if (empty($line) || $line[0] == '#')
                     continue;
 
                 list($key, $value) = explode('=', $line, 2);
@@ -293,6 +326,11 @@ function initialize()
                 if (empty($key) || empty($value))
                     continue;
 
+                if (!may_environment_key($key)) {
+                    error_log("Invalid default environment key: {$key}");
+                    continue;
+                }
+        
                 $_ENV[strtoupper($key)] = $value;
             }
         }
@@ -356,4 +394,21 @@ function shutdown_function()
         return;
 
     file_put_contents(JSON_RPC_DEBUG_FILE, implode("", $RPC_DEBUG_LOG), FILE_APPEND);
+}
+
+function may_environment_key($key) {
+    if (!is_string($key) || empty($key))
+        return false;
+
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $key))
+        return false;
+
+    // Check if the string doesn't start with a number
+    if (ctype_digit($key[0]))
+        return false;
+
+    // Additional checks if needed...
+
+    // it's ok
+    return true;
 }
