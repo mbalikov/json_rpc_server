@@ -108,10 +108,12 @@ function json_rpc_result($id, $result)
 
 function json_rpc_error($id, $error_code, $error_message)
 {
-    return '{"jsonrpc": "2.0", "error": '
-        . '{"code": '. $error_code .', "message": '. json_encode($error_message) .'}, '
-        . '"id": '. (empty($id) ? 'null' : json_encode($id))
-        . '}';
+    return
+        '{' .
+            '"jsonrpc": "2.0", ' ;
+            '"error": {"code": '. $error_code .', "message": '. json_encode($error_message) .'}, ' .
+            '"id": '. (empty($id) ? 'null' : json_encode($id)) .
+        '}';
 }
 
 /*
