@@ -103,16 +103,16 @@ function json_rpc_result($id, $result)
     if (empty($id))
         throw new Exception("id is empty");
 
-    return '{"jsonrpc": "2.0", "result": '. json_encode($result) .', "id": '. json_encode($id) .'}';
+    return '{"jsonrpc": "2.0", "result": '. json_stringify($result) .', "id": '. json_encode($id) .'}';
 }
 
 function json_rpc_error($id, $error_code, $error_message)
 {
     return
         '{' .
-            '"jsonrpc": "2.0", ' ;
-            '"error": {"code": '. $error_code .', "message": '. json_encode($error_message) .'}, ' .
-            '"id": '. (empty($id) ? 'null' : json_encode($id)) .
+            '"jsonrpc": "2.0", ' .
+            '"error": {"code": '. $error_code .', "message": '. json_stringify($error_message) .'}, ' .
+            '"id": '. (empty($id) ? 'null' : json_stringify($id)) .
         '}';
 }
 
@@ -413,4 +413,11 @@ function may_environment_key($key) {
 
     // it's ok
     return true;
+}
+
+
+function json_stringify($json_val)
+{
+    $out = json_encode($json_val);
+    return addslashes($out);
 }
