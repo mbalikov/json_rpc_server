@@ -242,7 +242,7 @@ function do_exec_handler($rpc_id, string $rpc_method, $rpc_params)
                 continue;
             if (is_array($v))
                 continue;
-            $environment[env_param_name($k)] = empty($v) ? true : $v;
+            $environment[env_param_name($k)] = $v;
         };
     }
     elseif (may_environment_key($rcp_params)) {
