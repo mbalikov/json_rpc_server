@@ -103,17 +103,23 @@ function json_rpc_result($id, $result)
     if (empty($id))
         throw new Exception("id is empty");
 
-    return '{"jsonrpc": "2.0", "result": '. json_stringify($result) .', "id": '. json_encode($id) .'}';
+    return json_encode([
+        "jsonrpc" => "2.0",
+        "result"  => $result,
+        "id"      => $id,
+    ]);
 }
 
 function json_rpc_error($id, $error_code, $error_message)
 {
-    return
-        '{' .
-            '"jsonrpc": "2.0", ' .
-            '"error": {"code": '. $error_code .', "message": '. json_stringify($error_message) .'}, ' .
-            '"id": '. (empty($id) ? 'null' : json_stringify($id)) .
-        '}';
+    return json_encode([
+        "jsonrpc" => "2.0",
+        "error" => [
+            "code" => $error_code,
+            "message" => $error_message,
+        ],
+        "id" => $id
+    ]);
 }
 
 /*
