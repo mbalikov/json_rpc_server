@@ -348,16 +348,20 @@ function initialize()
 function receive_json_post()
 {
     $http_request_method = $_SERVER['REQUEST_METHOD'] ?? '';
-    $http_content_type = $_SERVER['CONTENT_TYPE'] ?? '';
+    $http_content_type = trim($_SERVER['CONTENT_TYPE'] ?? '');
+    $mime_type = trim(explode(';', $http_content_type)[0]);
+
     if ($http_request_method !== 'POST'
-        || ($http_content_type !== 'application/json' &&
-            $http_content_type !== 'text/json'))
+        || ($mime_type !== 'application/json' &&
+            $mime_type !== 'text/json'))
     {
+        error_log("Unsupported method=\"$http_request_method\" and content-type=\"$http_content_type\"");
         return null;
     }
 
     $raw_data = file_get_contents('php://input');
     if (empty($raw_data)) {
+        error_log("Empty data from php://input");
         return null;
     }
 
@@ -365,6 +369,7 @@ function receive_json_post()
 
     $json_data = json_decode($raw_data, true);
     if (!is_array($json_data)) {
+        error_log("Invalid json string: $json_data");
         return null;
     }
 
